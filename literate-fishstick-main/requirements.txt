@@ -1,0 +1,9 @@
+django
+# Forces CPU-only versions of torch and torchvision
+torch --index-url https://download.pytorch.org/whl/cpu
+torchvision --index-url https://download.pytorch.org/whl/cpu
+ultralytics
+Pillow
+numpy
+langdetect
+opencv-python-headless

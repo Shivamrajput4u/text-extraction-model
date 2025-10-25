@@ -1,0 +1,244 @@
+{% load static %} <!-- Still needed for potential future static files, but not for the embedded JS -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indic Book Cover OCR</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom loader styles */
+        .loader {
+            border: 6px solid #f3f4f6; /* gray-100 */
+            border-top: 6px solid #4f46e5; /* indigo-600 */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Style for file input label on drag over */
+        .dragover {
+            background-color: #eef2ff; /* indigo-50 */
+            border-color: #4f46e5; /* indigo-600 */
+        }
+        /* Fade-in animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        /* Subtle background */
+        html {
+           background-color: #f9fafb; /* gray-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen p-4 md:p-8 flex flex-col items-center justify-center">
+
+    <!-- Loading Spinner -->
+    <div class="loader-wrapper fixed inset-0 bg-white bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center z-50 hidden" id="loader">
+        <div class="loader"></div>
+        <p class="mt-4 text-xl text-indigo-700 font-medium">Processing your image...</p>
+    </div>
+
+    <!-- Main Content Container -->
+    <div class="container w-full max-w-4xl mx-auto p-6 md:p-10 bg-white rounded-xl shadow-lg border border-gray-200 animate-fade-in">
+        <header class="text-center border-b border-gray-200 pb-6 mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500 mb-3">
+                Indic Book Cover OCR
+            </h1>
+            <p class="text-lg text-gray-600">Upload a cover image to detect and recognize text.</p>
+        </header>
+
+        <!-- Upload Form -->
+        <form id="ocr-form" method="post" enctype="multipart/form-data" class="flex flex-col items-center gap-6">
+            {% csrf_token %}
+            <div id="upload-area" class="upload-box w-full border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center bg-gray-50 hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-300 cursor-pointer">
+                <input type="file" name="image" id="file-upload" accept="image/*" required class="hidden">
+
+                <label for="file-upload" class="file-label flex flex-col items-center gap-3 cursor-pointer text-gray-500 hover:text-indigo-600 transition-colors">
+                     <!-- Upload icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mb-2 text-gray-400 group-hover:text-indigo-500 transition-colors duration-300"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span class="font-medium text-lg text-gray-700">Click to browse or drag & drop</span>
+                    <span class="text-sm text-gray-500">PNG, JPG, JPEG, WEBP accepted</span>
+                </label>
+
+                <span id="file-name" class="mt-4 text-gray-600 text-sm font-medium">No file chosen</span>
+            </div>
+            <button type="submit" class="w-full sm:w-auto px-10 py-3 text-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-blue-500 rounded-lg hover:from-indigo-700 hover:to-blue-600 transition-all duration-300 shadow hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-white transform hover:scale-105 active:scale-95">
+                ✨ Upload and Process
+            </button>
+        </form>
+
+        <!-- Original Image Display -->
+        {% if original_image %}
+            <div class="results-container mt-12 border-t border-gray-200 pt-8">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">Original Upload:</h2>
+                <div class="original-image-box border border-gray-200 rounded-lg overflow-hidden shadow">
+                    <img src="data:image/png;base64,{{ original_image }}" alt="Original Upload" class="w-full h-auto block">
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Results Grid -->
+        {% if results %}
+            <div class="results-container mt-12 border-t border-gray-200 pt-8">
+                <h2 class="text-2xl font-semibold text-gray-900 mb-6">Results:</h2>
+                <div class="results-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {% for res in results %}
+                        <div class="result-card flex flex-col bg-white border border-gray-200 rounded-lg shadow overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-indigo-400 transform hover:-translate-y-1">
+                            {% if res.image_data %}
+                                <div class="bg-gray-50 p-1 border-b border-gray-200"> <!-- Light padding around image -->
+                                    <img src="data:image/png;base64,{{ res.image_data }}" alt="Cropped Text" class="w-full h-auto block object-contain aspect-[3/1]"> <!-- Added aspect ratio -->
+                                </div>
+                            {% endif %}
+                            <div class="result-text p-4 text-center mt-auto">
+                                <span class="lang-tag inline-block bg-indigo-100 text-indigo-800 text-xs font-semibold px-3 py-1 rounded-full mb-3 shadow-sm">
+                                    {{ res.language }}
+                                </span>
+                                <p class="font-mono text-base font-semibold text-gray-800 break-words">
+                                    {{ res.text|default:"[No text recognized]" }}
+                                </p>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-gray-500 col-span-full text-center text-lg py-10">No text was detected in the image.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Footer Added Here -->
+    <footer class="mt-8 text-center text-gray-500 text-sm">
+        Developed by Kumar Shivam
+    </footer>
+
+    <!-- EMBEDDED JAVASCRIPT -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM loaded, running script..."); // Check if script runs
+
+            // Get elements
+            const fileUpload = document.getElementById('file-upload');
+            const fileNameSpan = document.getElementById('file-name');
+            const ocrForm = document.getElementById('ocr-form');
+            const loaderWrapper = document.getElementById('loader'); // Renamed for clarity
+            const uploadArea = document.getElementById('upload-area');
+
+            // Check if essential elements exist
+            if (!fileUpload) console.error("Could not find element with ID 'file-upload'");
+            if (!fileNameSpan) console.error("Could not find element with ID 'file-name'");
+            if (!ocrForm) console.error("Could not find element with ID 'ocr-form'");
+            if (!loaderWrapper) console.error("Could not find element with ID 'loader'");
+            if (!uploadArea) console.error("Could not find element with ID 'upload-area'");
+
+            // --- Function to update the file name display ---
+            function updateFileName(inputElement) {
+                console.log("updateFileName called"); // Check if function runs
+                if (fileNameSpan && inputElement) {
+                    if (inputElement.files && inputElement.files.length > 0) {
+                        const name = inputElement.files[0].name;
+                        console.log("File selected:", name); // Log the file name
+                        fileNameSpan.textContent = name;
+                        fileNameSpan.classList.remove('text-gray-600');
+                        fileNameSpan.classList.add('text-indigo-700', 'font-semibold'); // Make it stand out
+                    } else {
+                        console.log("No file selected or files array empty.");
+                        fileNameSpan.textContent = 'No file chosen';
+                        fileNameSpan.classList.remove('text-indigo-700', 'font-semibold');
+                        fileNameSpan.classList.add('text-gray-600');
+                    }
+                } else {
+                    console.error("Missing fileNameSpan or inputElement in updateFileName");
+                }
+            }
+
+            // 1. Update file name on 'change' event (click or drop)
+            if (fileUpload) {
+                fileUpload.addEventListener('change', function(event) {
+                    console.log("'change' event triggered on file input"); // Check if event fires
+                    updateFileName(event.target); // Pass the input element itself
+                });
+            }
+
+            // 2. Show loader on form submit
+            if (ocrForm && loaderWrapper) {
+                ocrForm.addEventListener('submit', function() {
+                    console.log("Form submitted, showing loader..."); // Check if submit runs
+                    if (loaderWrapper) {
+                         // Use Tailwind classes to show/hide
+                        loaderWrapper.classList.remove('hidden');
+                        loaderWrapper.classList.add('flex');
+                    }
+                });
+            }
+
+            // 3. Drag & Drop functionality
+            if (uploadArea && fileUpload) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, preventDefaults, false);
+                    document.body.addEventListener(eventName, preventDefaults, false); // Prevent browser default drop
+                });
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, () => uploadArea.classList.add('dragover'), false);
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('dragover'), false);
+                });
+
+                uploadArea.addEventListener('drop', handleDrop, false);
+
+                function handleDrop(e) {
+                    console.log("File dropped"); // Check if drop event fires
+                    let dt = e.dataTransfer;
+                    let files = dt.files;
+
+                    if (files.length > 0) {
+                        fileUpload.files = files; // Assign dropped files to the hidden input
+                        // Manually dispatch the change event so the name updates
+                        const changeEvent = new Event('change', { bubbles: true });
+                        fileUpload.dispatchEvent(changeEvent);
+                    } else {
+                         console.log("Drop event occurred but no files found.");
+                    }
+                }
+
+                // Make the whole area clickable
+                uploadArea.addEventListener('click', () => {
+                    console.log("Upload area clicked"); // Check if click works
+                    fileUpload.click();
+                });
+                 console.log("Drag & Drop listeners attached.");
+            } else {
+                 console.error("Could not attach Drag & Drop listeners - missing uploadArea or fileUpload element.");
+            }
+
+            console.log("Script finished attaching listeners.");
+        });
+    </script>
+</body>
+</html>
+
